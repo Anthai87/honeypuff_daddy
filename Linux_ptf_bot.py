@@ -1,5 +1,5 @@
 import socket  # To create a socket for networking
-import openai  # To interact with OpenAI's GPT-4 model
+import openai  # To interact with OpenAI's GPT-4o model
 import threading  # To handle multiple connections concurrently
 import Creds
 import os
@@ -52,6 +52,10 @@ class GPTFTPHoneypotIntegration:
     def handle_client(self, conn, addr):
         # Print the address of the connected client
         print(f"Connection from {addr}")
+
+        # Send initial FTP response (Welcome message)
+        conn.send("220 Welcome to the FTP server.\r\n".encode('utf-8'))
+
         while True:
             # Receive commands from the client (the hacker)
             command = conn.recv(1024).decode(
@@ -60,8 +64,10 @@ class GPTFTPHoneypotIntegration:
                 break  # Exit the loop if no command is received
 
             print(f"Received command: {command}")  # Print the received command
+
             # Query OpenAI to get a response for the command
             response = self.query_openai(command)
+
             # Send the response back to the client
             conn.send(response.encode('utf-8'))
 
@@ -76,14 +82,15 @@ class GPTFTPHoneypotIntegration:
         self.messages.append({"role": "user", "content": command})
 
         try:
-            # Send the command to the OpenAI API and get the response
+            # Send the command to the OpenAI API and get the response using the gpt-4o model
             completion = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="GPT-4o",  # Change the model to gpt-4o
                 messages=self.messages  # Use the updated messages list
             )
-            # Get the response from GPT-4
+            # Get the response from GPT-4o
             response_content = completion['choices'][0]['message']['content'].strip(
             )
+
             # Log the assistant's response
             self.messages.append(
                 {"role": "assistant", "content": response_content})
@@ -97,7 +104,7 @@ class GPTFTPHoneypotIntegration:
         except Exception as e:
             # Print any errors encountered while querying OpenAI
             print(f"Error querying OpenAI: {e}")
-            return "500 Internal Server Error"  # Return a generic error message
+            return "500 Internal Server Error\r\n"  # Return a generic error message
 
 
 if __name__ == "__main__":
