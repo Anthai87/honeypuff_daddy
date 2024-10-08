@@ -2,9 +2,26 @@ import socket  # To create a socket for networking
 import openai  # To interact with OpenAI's GPT-4 model
 import threading  # To handle multiple connections concurrently
 import Creds
+import os
+from datetime import datetime
+import yaml
 
 # Set your OpenAI API key
 openai.api_key = Creds.API_KEY
+
+# Set up history logging
+history_file = "history.txt"
+today = datetime.now()
+
+# Initialize personality for FTP
+initial_prompt = ""
+if os.path.exists('personalityFTP.yml'):
+    with open('personalityFTP.yml', 'r', encoding="utf-8") as file:
+        identity = yaml.safe_load(file)
+        identity = identity['personality']
+        initial_prompt = identity['prompt']
+else:
+    initial_prompt = "You are a helpful FTP server."
 
 
 class GPTFTPHoneypotIntegration:
@@ -12,6 +29,8 @@ class GPTFTPHoneypotIntegration:
         # Initialize the integration with the honeypot's IP and port
         self.honeypot_ip = honeypot_ip
         self.honeypot_port = honeypot_port
+        self.messages = [
+            {"role": "system", "content": f"You are a helpful FTP server. Your personality is: {initial_prompt}"}]
 
     def listen_for_commands(self):
         # Create a TCP socket for listening to incoming commands
@@ -25,7 +44,6 @@ class GPTFTPHoneypotIntegration:
 
             while True:
                 # Accept incoming connections
-                # conn is the connection object, addr is the address of the client
                 conn, addr = s.accept()
                 # Start a new thread to handle the client connection
                 threading.Thread(target=self.handle_client,
@@ -54,17 +72,28 @@ class GPTFTPHoneypotIntegration:
         prompt = f"You are a helpful FTP server. Respond to the following command: {
             command}"
 
+        # Update messages with the user's command
+        self.messages.append({"role": "user", "content": command})
+
         try:
             # Send the command to the OpenAI API and get the response
             completion = openai.ChatCompletion.create(
                 model="gpt-4",
-                messages=[
-                    # Format the message for the GPT-4 model
-                    {"role": "user", "content": prompt}
-                ]
+                messages=self.messages  # Use the updated messages list
             )
-            # Return the generated response from GPT-4
-            return completion['choices'][0]['message']['content'].strip()
+            # Get the response from GPT-4
+            response_content = completion['choices'][0]['message']['content'].strip(
+            )
+            # Log the assistant's response
+            self.messages.append(
+                {"role": "assistant", "content": response_content})
+
+            # Append the response to the history file
+            with open(history_file, "a+", encoding="utf-8") as history:
+                history.write(f"User: {command}\nAssistant: {
+                              response_content}\n")
+
+            return response_content
         except Exception as e:
             # Print any errors encountered while querying OpenAI
             print(f"Error querying OpenAI: {e}")
