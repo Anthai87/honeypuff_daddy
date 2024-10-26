@@ -9,9 +9,6 @@ import yaml
 # Set your OpenAI API key
 openai.api_key = Creds.API_KEY
 
-# Set up history logging
-history_file = "history.txt"
-today = datetime.now()
 
 # Initialize personality for FTP
 initial_prompt = ""
@@ -85,7 +82,9 @@ class GPTFTPHoneypotIntegration:
             # Send the command to the OpenAI API and get the response using the gpt-4o model
             completion = openai.ChatCompletion.create(
                 model="GPT-4o",  # Change the model to gpt-4o
-                messages=self.messages  # Use the updated messages list
+                messages=self.messages,   # Use the updated messages list
+                temperature=0.0,
+                max_tokens=800
             )
             # Get the response from GPT-4o
             response_content = completion['choices'][0]['message']['content'].strip(
@@ -94,11 +93,6 @@ class GPTFTPHoneypotIntegration:
             # Log the assistant's response
             self.messages.append(
                 {"role": "assistant", "content": response_content})
-
-            # Append the response to the history file
-            with open(history_file, "a+", encoding="utf-8") as history:
-                history.write(f"User: {command}\nAssistant: {
-                              response_content}\n")
 
             return response_content
         except Exception as e:
